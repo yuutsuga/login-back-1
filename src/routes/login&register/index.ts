@@ -7,31 +7,6 @@ import 'dotenv/config';
 const router = Router();
 const SECRET: string = process.env.SECRET as string;
 
-// middleware to verify login
-const loggedMiddleware: RequestHandler = (req, res, next) => {
-    const auth = req.headers.authorization || '';
-
-    const parts = auth.split(' ');
-
-    if(parts.length != 2)
-        return res.status(401).send();
-
-    const [prefix, token] = parts;
-
-    if(prefix !== 'Bearer')
-        return res.status(401).send();
-
-    jwt.verify(token, SECRET, (error, decoded) => {
-        if(error) {
-            return res.status(401).send(error);
-        }
-
-        res.locals.creatorId = (decoded as jwt.JwtPayload).id;
-
-        next();
-    });
-};
-
 // user register
 router.post('/register', async (req, res) => {
     const {name, email, password, role} = req.body;
@@ -73,6 +48,33 @@ router.post('/register', async (req, res) => {
         return res.status(401).send('undefined role');
     }
 
+});
+
+router.post('/login', async (req, res) => {
+    const {email, password} = req.body;
+    const infoNeeded = email && password;
+
+    if (!infoNeeded) {
+        return res.status(401).send('missing fields');
+    }
+
+    const user = await prisma.user.findFirst({
+        where: {
+            email
+        },
+        select: {
+            id: true,
+            password: true
+        }
+    });
+
+    if (!user) {
+        return res.status(401).send('please be registered');
+    }
+
+    if (!bcrypt.compareSync(password, user.password)) {
+        return res.status(401).send('the passwords are not the same');
+    }
 });
 
 export default router;
