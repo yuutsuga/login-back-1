@@ -7,10 +7,35 @@ import 'dotenv/config';
 const router = Router();
 const SECRET: string = process.env.SECRET as string;
 
+// middleware to verify login
+const loggedMiddleware: RequestHandler = (req, res, next) => {
+    const auth = req.headers.authorization || '';
+
+    const parts = auth.split(' ');
+
+    if(parts.length != 2)
+        return res.status(401).send();
+
+    const [prefix, token] = parts;
+
+    if(prefix !== 'Bearer')
+        return res.status(401).send();
+
+    jwt.verify(token, SECRET, (error, decoded) => {
+        if(error) {
+            return res.status(401).send(error);
+        }
+
+        res.locals.creatorId = (decoded as jwt.JwtPayload).id;
+
+        next();
+    });
+};
+
 // user register
 router.post('/register', async (req, res) => {
-    const {name, email, password} = req.body;
-    const infoNeeded = {name, email, password};
+    const {name, email, password, role} = req.body;
+    const infoNeeded = {name, email, password, role};
 
     if (!infoNeeded) {
         return res.status(401).send('missing fields');
@@ -20,60 +45,21 @@ router.post('/register', async (req, res) => {
         data: {
             name,
             email,
-            password: bcrypt.hashSync(password, 10)
+            password: bcrypt.hashSync(password, 10),
+            role
         }
     });
 
-    const user = await prisma.user.findFirst({
-        where: {
-            email,
-            password
-        }
-    });
+    const usersInfo = await prisma.user.findMany({ });
 
-    if (user) {
-        return res.status(401).send('user already exists')
+    if(role === "admin") {
+        return res.status(200).send({ usersInfo });
+    } else if (role === "user") {
+        return res.status(200).send({ name });
+    } else (!role); {
+        return res.status(401).send('undefined role');
     }
 
-    const token = jwt.sign(newUser, SECRET, {
-        expiresIn: '5h'
-    });
-
-    res.status(200).send({ newUser, token });
-});
-
-// user login
-router.post('/login', async (req, res) => {
-    const {email, password} = req.body;
-    const infoNeeded = email && password;
-
-    if (!infoNeeded) {
-        return res.status(401).send('missing fields')
-    }
-
-    const user = await prisma.user.findFirst({
-        where: {
-            email
-        },
-        select: {
-            id: true,
-            password: true
-        }
-    });
-
-    if (!user) {
-        return res.status(401).send('please be registered')
-    }
-
-    if (!bcrypt.compareSync(password, user.password)) {
-        return res.status(404).send('please try again')
-    }
-
-    const token = jwt.sign({id: user.id}, SECRET, {
-        expiresIn: '5h'
-    });
-
-    res.status(200).send({ user, token });
 });
 
 export default router;
