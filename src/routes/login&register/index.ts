@@ -41,6 +41,19 @@ router.post('/register', async (req, res) => {
         return res.status(401).send('missing fields');
     }
 
+    const findEmail = await prisma.user.findFirst({
+        where: {
+            email
+        }, 
+        select: {
+            email: true
+        }
+    })
+
+    if (findEmail) {
+        return res.status(401).send('this email is already in use');
+    }
+
     const newUser = await prisma.user.create({
         data: {
             name,
