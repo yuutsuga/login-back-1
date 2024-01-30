@@ -41,7 +41,7 @@ router.post('/register', async (req, res) => {
         return res.status(401).send('missing fields');
     }
 
-    const findEmail = await prisma.user.findFirst({
+    const searchedUserByEmail = await prisma.user.findFirst({
         where: {
             email
         }, 
@@ -50,7 +50,7 @@ router.post('/register', async (req, res) => {
         }
     })
 
-    if (findEmail) {
+    if (searchedUserByEmail) {
         return res.status(401).send('this email is already in use');
     }
 
@@ -63,10 +63,10 @@ router.post('/register', async (req, res) => {
         }
     });
 
-    const usersInfo = await prisma.user.findMany({ });
+    const users = await prisma.user.findMany({ });
 
     if(role === "admin") {
-        return res.status(200).send({ usersInfo });
+        return res.status(200).send({ users });
     } else if (role === "user") {
         return res.status(200).send({ name });
     } else (!role); {
