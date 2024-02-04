@@ -64,10 +64,14 @@ router.post('/register', async (req, res) => {
 
     const users = await prisma.user.findMany({ });
 
-    if(role === "admin") {
-        return res.status(200).send({ users });
-    } else if (role === "user") {
-        return res.status(200).send({ name });
+    const token = jwt.sign(newUser, SECRET, {
+        expiresIn: '5h'
+    });
+
+    if(role === "Admin") {
+        return res.status(200).send({ users, token });
+    } else if (role === "User") {
+        return res.status(200).send({ name, token });
     } else (!role); {
         return res.status(401).send('undefined role');
     }
@@ -105,9 +109,9 @@ router.post('/login', loggedMiddleware, async (req, res) => {
         return res.status(401).send('the passwords are not the same');
     }
 
-    if(user.role === "admin") {
+    if(user.role === "Admin") {
         return res.status(200).send({ users });
-    } else if (user.role === "user") {
+    } else if (user.role === "User") {
         return res.status(200).send({ user });
     } else (!user.role); {
         return res.status(401).send('undefined role');
@@ -141,7 +145,7 @@ router.get('/users_info', loggedMiddleware, async (req, res) => {
         return res.status(404).send('please be registered');
     }
 
-    if (user.role == 'admin') {
+    if (user.role == 'Admin') {
         return res.status(200).send({ users });
     } else (!user.role); {
         return res.status(401).send('undefined role')
