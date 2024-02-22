@@ -1,6 +1,6 @@
 import prisma from '../../database';
 import {  RequestHandler, Router } from 'express';
-import jwt from 'jsonwebtoken';
+import jwt, { decode } from 'jsonwebtoken';
 import bcrypt from 'bcrypt';
 import 'dotenv/config';
 
@@ -8,32 +8,37 @@ const router = Router();
 const SECRET: string = process.env.SECRET as string;
 
 // middleware to verify if user has token and role is admin or not
-const loggedMiddleware: RequestHandler = async (req, res, next) => {
+const isAdmin: RequestHandler = async (req, res, next) => {
     const auth = req.headers.authorization || '';
 
     const parts = auth.split(' ');
 
-    if(parts.length != 2)
+    if (parts.length != 2) {
         return res.status(401).send();
+    }
 
     const [prefix, token] = parts;
 
-    if(prefix !== 'Bearer')
+    if (prefix !== 'Bearer') {
         return res.status(401).send();
+    }
 
-    jwt.verify(token, SECRET, (error, decoded) => {
-        if(error) {
+    const userRole: any = await prisma.user.findFirst({
+        where: {
+            role: "Admin"
+        }
+    });
+
+    jwt.verify(token, SECRET, (error, decode) => {
+        if (error) {
             return res.status(401).send(error);
         }
-
-        res.locals.token = (decoded as jwt.JwtPayload).id;
-
-        if (res.locals.userRole !== "Admin") {
-            return res.status(401).send("you're not admin");
-        }
-
-        next();
     });
+    
+    if (userRole.role !== "Admin" || token === null) {
+        return res.status(401).send("you're not an admin");
+    }
+    next();
 };
 
 // user register
@@ -64,7 +69,7 @@ router.post('/register', async (req, res) => {
             email,
             password: bcrypt.hashSync(password, 10),
             role
-        }
+        },
     });
 
     const users = await prisma.user.findMany({ });
@@ -123,17 +128,21 @@ router.post('/login', async (req, res) => {
 });
 
 // users info
-router.get('/admin', loggedMiddleware, async (_, res) => {
-    const { userRole, token } = res.locals;
+router.get('/admin', isAdmin, async (_, res) => {
 
-    const users = await prisma.user.findMany({ 
-        where: {
-            id: token,
-            role: userRole
-        }
-    });
+   const users = await prisma.user.findMany({
+    where: {
+        role: "Admin"
+    },
+    select: {
+        name: true,
+        email: true,
+        password: true,
+        role: true
+    },
+   });
 
-    return res.status(200).send({ users })
+   res.status(200).send({ users });
 });
 
 export default router;
